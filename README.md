@@ -48,8 +48,6 @@ Grover 加速（量子） 2⁻¹²⁸ 仅平方加速
 
 文件 说明
 README.md 本文件
-WHITEPAPER.md 完整技术白皮书
-PATENT_DISCLOSURE.md 发明专利技术交底书
 SECURITY_PROOF.md 形式化安全性证明
 CCI_v1.1_Frozen.md Python 风格伪代码（含v1.1修复）
 
