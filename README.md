@@ -83,7 +83,7 @@
 | :--- | :--- |
 | `CCI_v1.0_Frozen.md` | 完整技术报告（含数学定义、伪代码） |
 | `Security_Proof.md` | 形式化安全性证明 |
-| `Patent_Disclosure.docx` | 发明专利技术交底书 |
+| `Patent_Disclosure.md` | 发明专利技术交底书 |
 | `whitepaper.md` | 技术白皮书摘要 |
 | `src/` | C++ / Python 实现（待补充） |
 
