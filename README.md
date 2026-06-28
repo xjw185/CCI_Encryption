@@ -58,8 +58,6 @@ CCI_v1.1_Frozen.md Python 风格伪代码（含v1.1修复）
 
 · ✅ GitHub Commit 历史
 · ✅ GitHub Release v1.0（已发布）
-· ✅ 作者学校邮箱自存证
-· 🔄 区块链存证（OriginStamp 已提交，待确认）
 
 ⚠️ 项目状态
 
