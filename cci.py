@@ -2,7 +2,7 @@
 # ============================================================
 # CCI: Constrained Chaotic Iteration Encryption System
 # 版本: 1.1 (2026-06-28)
-# 作者: [你的姓名]
+# 作者: [肖景文]
 # 许可证: GPL v3 + 商业授权例外 (详见 LICENSE 文件)
 #
 # 本程序是自由软件: 你可以根据自由软件基金会发布的 GNU
@@ -11,9 +11,10 @@
 # 本程序分发的目的是希望它有用，但没有任何担保；甚至没有
 # 隐含的适销性或特定用途适用性的担保。更多细节请参见
 # GNU通用公共许可证第3版。
-# ⚠️ 本程序为学术原型，未经第三方审计，请勿直接用于生产环境。
+#
 # 商业授权例外：任何商业闭源使用须获得作者书面授权。
-# ============================================================# -*- coding: utf-8 -*-
+# ============================================================
+# -*- coding: utf-8 -*-
 """
 CCI: Constrained Chaotic Iteration Encryption System
 版本: 1.1 (2026-06-28)
@@ -21,7 +22,7 @@ CCI: Constrained Chaotic Iteration Encryption System
   1. 缠绕数初始化依赖 (跳过Z轴点)
   2. 密钥搜索崩溃 (预检模式)
   3. 时间戳同步 (固定于密文)
-  4. 主密钥泄漏模型 (版本化管理)
+  4. 主密钥泄漏模型 (版本化管理 + 废止过滤)
 
 用法: python cci.py
 """
@@ -74,6 +75,7 @@ class MasterKeyEntry:
     seed: str
     effective_from: int
     description: str = ""
+    is_revoked: bool = False          # [FIX 4] 显式废止标记
 
 
 # ============================================================
@@ -143,7 +145,7 @@ def _seed_to_point(seed: str) -> Tuple[float, float, float]:
 
 
 # ============================================================
-# 第三部分：主密钥管理器
+# 第三部分：主密钥管理器（含废止过滤）
 # ============================================================
 
 class MasterKeyManager:
@@ -156,35 +158,58 @@ class MasterKeyManager:
     def add_key(self, version: int, seed: str, effective_from: int,
                 description: str = "") -> None:
         self._keys[version] = MasterKeyEntry(seed, effective_from, description)
-        # 更新当前版本 (取生效时间最新者)
+        # 如果当前版本为空，或者新版本更优，才更新
         if self._current_version is None:
             self._current_version = version
         else:
-            cur = self._keys[self._current_version]
-            if effective_from > cur.effective_from:
+            cur = self._keys.get(self._current_version)
+            if cur is None or cur.is_revoked:
+                # 当前版本已被废止或不存在，重新选择最佳版本
+                self._current_version = self._get_best_version()
+            elif effective_from > cur.effective_from and not self._keys[version].is_revoked:
                 self._current_version = version
 
+    def _get_best_version(self) -> Optional[int]:
+        """内部方法：获取当前最佳可用版本（未被废止且生效时间最新）"""
+        active = [(v, e) for v, e in self._keys.items() if not e.is_revoked]
+        if not active:
+            return None
+        active.sort(key=lambda x: x[1].effective_from, reverse=True)
+        return active[0][0]
+
     def get_key(self, timestamp: int) -> Tuple[Optional[int], Optional[str]]:
-        """根据时间戳获取对应版本的主密钥"""
-        applicable = [(v, e.seed) for v, e in self._keys.items()
-                      if e.effective_from <= timestamp]
+        """根据时间戳获取对应版本的主密钥（自动过滤已废止版本）"""
+        applicable = [
+            (v, e.seed) for v, e in self._keys.items()
+            if e.effective_from <= timestamp and not e.is_revoked
+        ]
         if not applicable:
             return (None, None)
         applicable.sort(key=lambda x: x[0])
         return applicable[-1]
 
     def get_current_key(self) -> Tuple[Optional[int], Optional[str]]:
-        if self._current_version is None:
+        """获取当前可用的最新版本主密钥（自动过滤已废止版本）"""
+        best_version = self._get_best_version()
+        if best_version is None:
             return (None, None)
+        self._current_version = best_version
         return (self._current_version, self._keys[self._current_version].seed)
 
     def emergency_revoke(self, compromised_version: int,
                          new_seed: str, effective_from: int) -> None:
-        """紧急废止泄露的主密钥"""
+        """
+        紧急废止泄露的主密钥，创建新版本
+        废止的版本保留用于解密历史数据，但不再用于新加密
+        """
         if compromised_version in self._keys:
+            self._keys[compromised_version].is_revoked = True
             self._keys[compromised_version].description += " [REVOKED]"
-        self.add_key(compromised_version + 1, new_seed, effective_from,
+        new_version = compromised_version + 1
+        self.add_key(new_version, new_seed, effective_from,
                      "Emergency rollover after revocation")
+        # 强制刷新当前版本为最佳可用版本
+        self._current_version = self._get_best_version()
 
 
 # ============================================================
@@ -303,11 +328,11 @@ def encrypt(plain_point: Tuple[float, float, float],
         # 若显式传入，尝试匹配版本号
         if key_version is None:
             for v, entry in GLOBAL_KEY_MANAGER._keys.items():
-                if entry.seed == master_seed:
+                if entry.seed == master_seed and not entry.is_revoked:
                     key_version = v
                     break
             if key_version is None:
-                # 未知主密钥：临时分配版本号 -1
+                # 未知主密钥或已废止：临时分配版本号 -1
                 key_version = -1
 
     # 生成密钥 (跳过预检，因为 encrypt 入口会先调 precheck)
@@ -351,7 +376,8 @@ def decrypt_verify(cipher: CipherText,
         # 获取正确版本的主密钥
         if master_seed is None:
             entry = GLOBAL_KEY_MANAGER._keys.get(cipher.key_version)
-            if entry is None:
+            if entry is None or entry.is_revoked:
+                # 版本不存在或已废止，拒绝
                 return False
             master_seed = entry.seed
 
@@ -400,8 +426,9 @@ def decrypt_verify(cipher: CipherText,
 
 GLOBAL_KEY_MANAGER = MasterKeyManager()
 # 初始化默认主密钥 (实际部署应安全存储)
+# ⚠️ 重要：请在实际部署前替换为自己的主密钥（256位）
 GLOBAL_KEY_MANAGER.add_key(1, "REPLACE_WITH_YOUR_OWN_256BIT_MASTER_SEED", 0,
-                           "Initial development key")
+                           "Demo placeholder key - replace before use")
 
 
 # ============================================================
