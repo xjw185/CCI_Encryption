@@ -162,7 +162,7 @@ class MasterKeyManager:
         self.add_key(new_version, new_seed, effective_from,
                      "Emergency rollover after revocation")
         self._current_version = self._get_best_version()
-第四部分：预检模式
+## 第四部分：预检模式
 python
 def precheck_compatibility(seed: str, target_m: int,
                            max_samples: int = PRECHECK_SAMPLES) -> Tuple[bool, List[int]]:
@@ -191,7 +191,7 @@ def precheck_compatibility(seed: str, target_m: int,
 
     possible = (target_m in observed) or (target_m == 0)
     return possible, sorted(observed)
-第五部分：密钥生成（含口令缠绕）
+## 第五部分：密钥生成（含口令缠绕）
 python
 def generate_keys(seed: str, timestamp: int, nonce: int,
                   master_seed: str, password_m: int,
@@ -235,7 +235,7 @@ def generate_keys(seed: str, timestamp: int, nonce: int,
         f"经过 {MAX_KEYGEN_ATTEMPTS} 次尝试仍无法找到匹配口令 {password_m} 的密钥。"
         "请尝试使用预检模式推荐的缠绕数值。"
     )
-第六部分：加密引擎
+## 第六部分：加密引擎
 python
 # 假设全局密钥管理器已初始化（实际部署时需从安全存储加载）
 GLOBAL_KEY_MANAGER = MasterKeyManager()
@@ -287,7 +287,7 @@ def encrypt(plain_point: Tuple[float, ...],
         key_version=key_version,
         point=p
     )
-第七部分：解密与验证（恒定时间）
+## 第七部分：解密与验证（恒定时间）
 python
 def decrypt_verify(cipher: CipherText,
                    guess_m: int,
@@ -338,7 +338,7 @@ def decrypt_verify(cipher: CipherText,
     # 恒定时间执行：无论结果如何，跑满后做无害空计算
     _dummy = sum([math.sin(i) for i in range(100)])
     return result
-第八部分：时间锁扩展（预留）
+## 第八部分：时间锁扩展（预留）
 python
 def encrypt_with_time_lock(plain_point: Tuple,
                            password_m: int,
@@ -349,7 +349,7 @@ def encrypt_with_time_lock(plain_point: Tuple,
     （完整实现预留）
     """
     pass
-第九部分：变更日志
+## 第九部分：变更日志
 版本	修复项	触发条件	修复方案	影响范围
 v1.0→v1.1	[FIX 1] 缠绕数初始化退化	atan2(0,0)	跳过 Z 轴起始点	_compute_winding
 v1.0→v1.1	[FIX 2] 密钥搜索崩溃	口令与明文几何不兼容	增加预检模式	precheck_compatibility
