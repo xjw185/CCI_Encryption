@@ -238,94 +238,71 @@ def _seed_to_point(seed: str) -> Tuple:
 
 
 ```python
-
 class MasterKeyManager:
-
     """
-
     [FIX 4] 主密钥轮换与多密钥容灾
-
     """
 
     def __init__(self):
-
         self._keys: dict[int, MasterKeyEntry] = {}
-
         self._current_version: Optional[int] = None
 
-
-
-    def add_key(self, version: int, seed: str, effective_from: int, description: str = ""):
-
+    def add_key(self, version: int, seed: str, effective_from: int,
+                description: str = "") -> None:
         self._keys[version] = MasterKeyEntry(seed, effective_from, description)
-
-        if self._current_version is None or effective_from > self._keys.get(self._current_version, MasterKeyEntry("", 0)).effective_from:
-
+        # 如果当前版本为空，或者新版本更优，才更新
+        if self._current_version is None:
             self._current_version = version
+        else:
+            cur = self._keys.get(self._current_version)
+            if cur is None or cur.is_revoked:
+                # 当前版本已被废止或不存在，重新选择最佳版本
+                self._current_version = self._get_best_version()
+            elif effective_from > cur.effective_from and not self._keys[version].is_revoked:
+                self._current_version = version
 
-
+    def _get_best_version(self) -> Optional[int]:
+        """内部方法：获取当前最佳可用版本（未被废止且生效时间最新）"""
+        active = [(v, e) for v, e in self._keys.items() if not e.is_revoked]
+        if not active:
+            return None
+        active.sort(key=lambda x: x[1].effective_from, reverse=True)
+        return active[0][0]
 
     def get_key(self, timestamp: int) -> Tuple[Optional[int], Optional[str]]:
-
-        """根据时间戳选择对应的主密钥版本"""
-
-        applicable = [(v, e.seed) for v, e in self._keys.items() if e.effective_from <= timestamp]
-
+        """根据时间戳获取对应版本的主密钥（自动过滤已废止版本）"""
+        applicable = [
+            (v, e.seed) for v, e in self._keys.items()
+            if e.effective_from <= timestamp and not e.is_revoked
+        ]
         if not applicable:
-
             return (None, None)
-
         applicable.sort(key=lambda x: x[0])
-
         return applicable[-1]
 
-
-
     def get_current_key(self) -> Tuple[Optional[int], Optional[str]]:
-
-        if self._current_version is None:
-
+        """获取当前可用的最新版本主密钥（自动过滤已废止版本）"""
+        best_version = self._get_best_version()
+        if best_version is None:
             return (None, None)
-
+        self._current_version = best_version
         return (self._current_version, self._keys[self._current_version].seed)
 
-
-
-    def emergency_revoke(self, compromised_version: int, new_seed: str, effective_from: int):
-
+    def emergency_revoke(self, compromised_version: int,
+                         new_seed: str, effective_from: int) -> None:
         """
-
-        [FIX 4] 紧急废止：废弃泄露的主密钥版本，启用新版本。
-
-        注意：历史密文仍用旧版本解密，但新加密用新版本。
-
+        紧急废止泄露的主密钥，创建新版本
+        废止的版本保留用于解密历史数据，但不再用于新加密
         """
-
         if compromised_version in self._keys:
-
-            # 标记为废弃（不删除，仍可用于解密历史数据）
-
+            self._keys[compromised_version].is_revoked = True
             self._keys[compromised_version].description += " [REVOKED]"
-
-        self.add_key(compromised_version + 1, new_seed, effective_from, "Emergency rollover")
-
-
-
-
-
-# ---------- 全局主密钥管理器实例（由系统初始化）----------
-
-GLOBAL_KEY_MANAGER = MasterKeyManager()
-
-# 初始化默认主密钥（实际部署时应从安全存储加载）
-
-GLOBAL_KEY_MANAGER.add_key(1, "DEFAULT_MASTER_SEED_CHANGE_ME", 0, "Initial key")
-
+        new_version = compromised_version + 1
+        self.add_key(new_version, new_seed, effective_from,
+                     "Emergency rollover after revocation")
+        # 强制刷新当前版本为最佳可用版本
+        self._current_version = self._get_best_version()
 ```
-
-
-
----
 
 
 
