@@ -48,7 +48,10 @@ Grover 加速（量子） 2⁻¹²⁸ 仅平方加速
 
 文件 说明
 README.md 本文件
-CCI_v1.1_Frozen.md Python 风格伪代码（含v1.1修复）
+CCI_v1.2_Frozen.md Python 风格伪代码（含v1.2修复）
+LICENSE.txt
+CHANGELOG.md
+cci.py
 
 📅 存证与时间戳
 
