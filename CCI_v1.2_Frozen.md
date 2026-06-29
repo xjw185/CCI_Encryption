@@ -54,7 +54,7 @@ class MasterKeyEntry:
     effective_from: int
     description: str = ""
     is_revoked: bool = False          # [FIX] 显式废止标记
-第二部分：辅助数学函数
+## 第二部分：辅助数学函数
 python
 def _chaos_map(p: Tuple, alpha: float, beta: float, gamma: float) -> Tuple:
     x, y, z = p
@@ -102,7 +102,7 @@ def _seed_to_point(seed: str) -> Tuple:
     y = (int(h[8:16], 16) / 2**32) * 2 - 1
     z = (int(h[16:24], 16) / 2**32) * 2 - 1
     return (x, y, z)
-第三部分：主密钥管理器
+## 第三部分：主密钥管理器
 python
 class MasterKeyManager:
     """
