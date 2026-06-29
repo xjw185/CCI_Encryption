@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ============================================================
 # CCI: Constrained Chaotic Iteration Encryption System
-# 版本: 1.2 (2026-06-28)
+# 版本: 1.2 (2026-06-29)
 # 作者: [肖景文]
 # 许可证: GPL v3 + 商业授权例外 (详见 LICENSE 文件)
 #
@@ -16,12 +16,13 @@
 # ============================================================# -*- coding: utf-8 -*-
 """
 CCI: Constrained Chaotic Iteration Encryption System
-版本: 1.1 (2026-06-28)
+版本: 1.2 (2026-06-29)
 包含全部四项工程修复：
   1. 缠绕数初始化依赖 (跳过Z轴点)
   2. 密钥搜索崩溃 (预检模式)
   3. 时间戳同步 (固定于密文)
   4. 主密钥泄漏模型 (版本化管理)
+  5. 版本问题导致失效
 
 用法: python cci.py
 """
@@ -412,7 +413,7 @@ GLOBAL_KEY_MANAGER.add_key(1, "REPLACE_WITH_YOUR_OWN_256BIT_MASTER_SEED", 0,
 def main():
     """运行完整测试闭环"""
     print("=" * 60)
-    print("CCI 加密系统 v1.1 – 测试演示")
+    print("CCI 加密系统 v1.2 – 测试演示")
     print("=" * 60)
 
     # 1. 设置测试数据
